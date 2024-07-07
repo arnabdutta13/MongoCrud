@@ -13,7 +13,6 @@ import java.util.concurrent.ExecutionException;
 import org.bson.BSONDecoder;
 import org.bson.BSONObject;
 import org.bson.BasicBSONDecoder;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,9 +36,6 @@ public class EmployeeController {
 	private final EmployeeRepo employeeRepo;
 	
 	private final KafkaTemplate<String, Object> kafkaTemplate;
-	
-	@Value("${employee.topic}")
-	private String employeeTopic;
 	
 	@GetMapping("/createEmployee/{nums}")
 	public String createEmployees(@PathVariable("nums")int nums) {
@@ -71,7 +67,7 @@ public class EmployeeController {
 	}
 	
 	@GetMapping("/readBson")
-	public String readBson() throws FileNotFoundException, InterruptedException, ExecutionException {
+	public String readBson() throws FileNotFoundException, InterruptedException, ExecutionException, ClassNotFoundException {
 		long start = System.currentTimeMillis();
 		File file = new File("C:\\STS\\Java\\Mongo\\dump\\test\\employee.bson");
         InputStream inputStream = new BufferedInputStream(new FileInputStream(file));
@@ -82,15 +78,16 @@ public class EmployeeController {
             while (inputStream.available() > 0) {
 
                 BSONObject obj = decoder.readObject(inputStream);
-                if(obj == null){
+                if(obj == null) {
                     break;
                 }
                 System.out.println(obj);
                 ObjectMapper om = new ObjectMapper();
                 String json = bsonToJson(obj);
-                Employee em = om.readValue(json, Employee.class);
-                System.out.println("Employee : " + em);
-                kafkaTemplate.send(employeeTopic, em).get();
+                Class cls = Class.forName(obj.get("_class").toString());
+                Object em = om.readValue(json, cls);
+                System.out.println(cls.getSimpleName() + " : " + em);
+                kafkaTemplate.send(cls.getSimpleName().toLowerCase(), em).get();
                 count++;
                 
             }
